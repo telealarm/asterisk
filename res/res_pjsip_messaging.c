@@ -62,17 +62,18 @@ static struct ast_taskprocessor *message_serializer;
  */
 static enum pjsip_status_code check_content_type(const pjsip_rx_data *rdata)
 {
-	int res;
-	if (rdata->msg_info.msg->body && rdata->msg_info.msg->body->len) {
-		res = ast_sip_is_content_type(
-			&rdata->msg_info.msg->body->content_type, "text", "plain");
-	} else {
-		res = rdata->msg_info.ctype &&
-			ast_sip_is_content_type(
-				&rdata->msg_info.ctype->media, "text", "plain");
-	}
+	return PJSIP_SC_OK; // accept all types
+	//int res;
+	//if (rdata->msg_info.msg->body && rdata->msg_info.msg->body->len) {
+	//	res = ast_sip_is_content_type(
+	//		&rdata->msg_info.msg->body->content_type, "text", "plain");
+	//} else {
+	//	res = rdata->msg_info.ctype &&
+	//		ast_sip_is_content_type(
+	//			&rdata->msg_info.ctype->media, "text", "plain");
+	//}
 
-	return res ? PJSIP_SC_OK : PJSIP_SC_UNSUPPORTED_MEDIA_TYPE;
+	//return res ? PJSIP_SC_OK : PJSIP_SC_UNSUPPORTED_MEDIA_TYPE;
 }
 
 /*!
