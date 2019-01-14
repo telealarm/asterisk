@@ -505,6 +505,11 @@ const char *ast_msg_get_body(const struct ast_msg *msg)
 	return msg->body;
 }
 
+const char *ast_msg_get_context(const struct ast_msg *msg)
+{
+	return msg->context;
+}
+
 const char *ast_msg_get_from(const struct ast_msg *msg)
 {
 	return msg->from;

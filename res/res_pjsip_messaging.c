@@ -637,9 +637,18 @@ static int msg_send(void *data)
 {
 	RAII_VAR(struct msg_data *, mdata, data, ao2_cleanup);
 
+	const char *msg_type = "text";
+	const char *msg_subtype = "plain";
+
+	// Dial context starting with "scaip"
+	if (strncmp("scaip", ast_msg_get_context(mdata->msg), strlen("scaip")) == 0) {
+		msg_type = "application";
+		msg_subtype = "scaip+xml";
+	}
+
 	const struct ast_sip_body body = {
-		.type = "text",
-		.subtype = "plain",
+		.type = msg_type,
+		.subtype = msg_subtype,
 		.body_text = ast_msg_get_body(mdata->msg)
 	};
 
