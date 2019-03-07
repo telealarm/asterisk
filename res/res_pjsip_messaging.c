@@ -640,18 +640,6 @@ static int msg_send(void *data)
 	const char *msg_type = "text";
 	const char *msg_subtype = "plain";
 
-	// Dial context starting with "scaip"
-	if (strncmp("scaip", ast_msg_get_context(mdata->msg), strlen("scaip")) == 0) {
-		msg_type = "application";
-		msg_subtype = "scaip+xml";
-	}
-
-	const struct ast_sip_body body = {
-		.type = msg_type,
-		.subtype = msg_subtype,
-		.body_text = ast_msg_get_body(mdata->msg)
-	};
-
 	pjsip_tx_data *tdata;
 	RAII_VAR(char *, uri, NULL, ast_free);
 	RAII_VAR(struct ast_sip_endpoint *, endpoint, NULL, ao2_cleanup);
@@ -672,11 +660,42 @@ static int msg_send(void *data)
 	update_to(tdata, mdata->to);
 	update_from(tdata, mdata->from);
 
-	if (ast_sip_add_body(tdata, &body)) {
-		pjsip_tx_data_dec_ref(tdata);
-		ast_log(LOG_ERROR, "PJSIP MESSAGE - Could not add body to request\n");
-		return -1;
-	}
+	// Get original Content-Type
+        const char *original_content_type = ast_msg_get_var(mdata->msg, "Content-type");
+        size_t original_content_type_size = sizeof(char) * strlen(original_content_type) + 1;
+        char *tmp_content_type = (char*) ast_malloc(original_content_type_size);
+        memcpy(tmp_content_type, original_content_type, original_content_type_size);
+
+        if (tmp_content_type) {
+                // split content type
+                char *tmp_type = strtok(tmp_content_type, "/");
+                char *tmp_subtype = 0;
+                if (tmp_type) {
+                        tmp_subtype = strtok(0, "/");
+                }
+                if (tmp_type && tmp_subtype) {
+                        msg_type = tmp_type;
+                        msg_subtype = tmp_subtype;
+                }
+        }
+
+        const struct ast_sip_body body = {
+                .type = msg_type,
+                .subtype = msg_subtype,
+                .body_text = ast_msg_get_body(mdata->msg)
+        };
+
+        int add_body = ast_sip_add_body(tdata, &body);
+
+        // free content-type
+        ast_free(tmp_content_type);
+        tmp_content_type = 0;
+
+        if (add_body) {
+                pjsip_tx_data_dec_ref(tdata);
+                ast_log(LOG_ERROR, "PJSIP MESSAGE - Could not add body to request\n");
+                return -1;
+        }
 
 	vars_to_headers(mdata->msg, tdata);
 
