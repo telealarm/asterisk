@@ -55,7 +55,7 @@ static struct ast_taskprocessor *message_serializer;
  * \internal
  * \brief Checks to make sure the request has the correct content type.
  *
- * \details This module supports the following media types: "text/plain".
+ * \details This module supports the following media types: "text/plain" and "application/scaip+xml" (TeleAlarm)
  * Return unsupported otherwise.
  *
  * \param rdata The SIP request
@@ -64,11 +64,16 @@ static enum pjsip_status_code check_content_type(const pjsip_rx_data *rdata)
 {
 	int res;
 	if (rdata->msg_info.msg->body && rdata->msg_info.msg->body->len) {
-		res = ast_sip_is_content_type(
-			&rdata->msg_info.msg->body->content_type, "text", "plain");
-	} else {
-		res = rdata->msg_info.ctype &&
+		res = 
 			ast_sip_is_content_type(
+				&rdata->msg_info.msg->body->content_type, "application", "scaip+xml") ||
+			ast_sip_is_content_type(
+				&rdata->msg_info.msg->body->content_type, "text", "plain");
+	} else {
+		res = 
+			rdata->msg_info.ctype && ast_sip_is_content_type(
+				&rdata->msg_info.ctype->media, "application", "scaip+xml") ||
+			rdata->msg_info.ctype && ast_sip_is_content_type(
 				&rdata->msg_info.ctype->media, "text", "plain");
 	}
 
@@ -639,11 +644,8 @@ static int msg_send(void *data)
 {
 	RAII_VAR(struct msg_data *, mdata, data, ao2_cleanup);
 
-	const struct ast_sip_body body = {
-		.type = "text",
-		.subtype = "plain",
-		.body_text = ast_msg_get_body(mdata->msg)
-	};
+	const char *msg_type = "text";
+	const char *msg_subtype = "plain";
 
 	pjsip_tx_data *tdata;
 	RAII_VAR(char *, uri, NULL, ast_free);
@@ -665,11 +667,42 @@ static int msg_send(void *data)
 	update_to(tdata, mdata->to);
 	update_from(tdata, mdata->from);
 
-	if (ast_sip_add_body(tdata, &body)) {
-		pjsip_tx_data_dec_ref(tdata);
-		ast_log(LOG_ERROR, "PJSIP MESSAGE - Could not add body to request\n");
-		return -1;
-	}
+	// Get original Content-Type
+        const char *original_content_type = ast_msg_get_var(mdata->msg, "Content-type");
+        size_t original_content_type_size = sizeof(char) * strlen(original_content_type) + 1;
+        char *tmp_content_type = (char*) ast_malloc(original_content_type_size);
+        memcpy(tmp_content_type, original_content_type, original_content_type_size);
+
+        if (tmp_content_type) {
+                // split content type
+                char *tmp_type = strtok(tmp_content_type, "/");
+                char *tmp_subtype = 0;
+                if (tmp_type) {
+                        tmp_subtype = strtok(0, "/");
+                }
+                if (tmp_type && tmp_subtype) {
+                        msg_type = tmp_type;
+                        msg_subtype = tmp_subtype;
+                }
+        }
+
+        const struct ast_sip_body body = {
+                .type = msg_type,
+                .subtype = msg_subtype,
+                .body_text = ast_msg_get_body(mdata->msg)
+        };
+
+        int add_body = ast_sip_add_body(tdata, &body);
+
+        // free content-type
+        ast_free(tmp_content_type);
+        tmp_content_type = 0;
+
+        if (add_body) {
+                pjsip_tx_data_dec_ref(tdata);
+                ast_log(LOG_ERROR, "PJSIP MESSAGE - Could not add body to request\n");
+                return -1;
+        }
 
 	vars_to_headers(mdata->msg, tdata);
 
