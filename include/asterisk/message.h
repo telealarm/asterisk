@@ -290,6 +290,18 @@ const char *ast_msg_get_var(struct ast_msg *msg, const char *name);
 const char *ast_msg_get_body(const struct ast_msg *msg);
 
 /*!
+* \brief Retrieve the context associated with this message
+*
+* \since 16.1.0
+*
+* \param msg The message to get the endpoint from
+*
+* \retval The context associated with the message
+* \retval NULL or empty string if the message has no associated context
+*/
+const char *ast_msg_get_context(const struct ast_msg *msg);
+
+/*!
  * \brief Retrieve the source of this message
  *
  * \since 12.5.0
